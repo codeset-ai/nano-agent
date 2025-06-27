@@ -19,6 +19,7 @@ def _parse() -> argparse.Namespace:
     p.add_argument("--top_k", type=int, default=20, help="Top-k sampling cutoff; only the highest-probability `k` tokens are considered.")
     p.add_argument("--verbose", action="store_true", help="Stream tool calls as they happen")
     p.add_argument("--no-log", dest="log", action="store_false", help="Disable logging of agent activity to file")
+    p.add_argument("--remote", action="store_true", help="Run agent in remote mode on a codeset environment")
     p.set_defaults(log=True)
     return p.parse_args()
 
@@ -37,6 +38,7 @@ def main():
         top_k=args.top_k,
         verbose=args.verbose,
         log=args.log,
+        remote=args.remote,
     )
     agent.run(args.task, args.path)
 

@@ -20,20 +20,21 @@ SHELL_TOOL = {
 }
 
 PATCH_TOOL = {
-    "type": "function", 
+    "type": "function",
     "function": {
         "name": "apply_patch",
-        "description": "Replace exact text in file. The search string must appear exactly once. If patch fails, re-read the file and try again with corrected search.",
+        "description": "Apply a patch in the form of a unified diff.",
         "parameters": {
             "type": "object",
             "properties": {
-                "search": {"type": "string", "description": "Exact text to find (including whitespace/indentation)"},
-                "replace": {"type": "string", "description": "New text to replace with"},
-                "file": {"type": "string", "description": "Relative path like: src/main.py"}
+                "patch": {
+                    "type": "string",
+                    "description": "The unified diff to apply. It must be in the git diff format.",
+                }
             },
-            "required": ["search", "replace", "file"]
-        }
-    }
+            "required": ["patch"],
+        },
+    },
 }
 
 
@@ -74,45 +75,34 @@ def shell(args: dict, repo_root: Path, stats: "ToolStats", timeout: int = 4, ver
 
 
 def apply_patch(args: dict, repo_root: Path, stats: "ToolStats", verbose: bool = False) -> str:
-    """Apply a literal search/replace to one file."""
-
-    if "search" not in args or "replace" not in args or "file" not in args:
-        if verbose: print("invalid apply_patch call")
+    """Apply a patch to the repository using git apply."""
+    if "patch" not in args:
+        if verbose:
+            print("invalid apply_patch call")
         stats.record_patch(success=False)
         return warning("invalid `apply_patch` arguments")
-    
-    search, replace, file = args["search"], args["replace"], args["file"]
-    if verbose: print(f"apply_patch(..., ..., {file})")
+
+    patch = args["patch"]
+    if verbose:
+        print(f"apply_patch(...)")
 
     try:
-        target = (repo_root / file).resolve()
-        if not str(target).startswith(str(repo_root.resolve())):
-            stats.record_patch(success=False)
-            return feedback("file must be inside the repository")
-        
-        if not target.exists():
-            stats.record_patch(success=False)
-            return feedback(f"file {file} not found")
-        
-        text = target.read_text()
-        search_count = text.count(search)
-
-        if search_count == 0:
-            stats.record_patch(success=False)
-            return feedback("search string not found - try using grep to find the exact text")
-        
-        if search_count > 1:
-            stats.record_patch(success=False)
-            return feedback(f"search ambiguous: {search_count} matches - add more context to make search unique")
-        
-        new_text = text.replace(search, replace, 1)
-        target.write_text(new_text)
+        subprocess.run(
+            ["git", "apply", "--unsafe-paths", "-"],
+            input=patch,
+            cwd=repo_root,
+            check=True,
+            text=True,
+            capture_output=True,
+        )
         stats.record_patch(success=True)
         return feedback("patch applied successfully")
-
-    except:
+    except subprocess.CalledProcessError as e:
         stats.record_patch(success=False)
-        return feedback("patch operation failed")
+        return feedback(f"patch application failed: {e.stderr}")
+    except Exception as e:
+        stats.record_patch(success=False)
+        return feedback(f"an unexpected error occurred: {e}")
     
 
 MONITORED_COMMANDS = {

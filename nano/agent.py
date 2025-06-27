@@ -4,8 +4,9 @@ from pathlib import Path
 from typing import Optional, Union
 from datetime import datetime
 
-from nano.utils import is_git_repo, is_clean, git_diff, feedback, warning   
+from nano.utils import is_git_repo, is_clean, git_diff, feedback, warning
 from nano.tools import shell, apply_patch, SHELL_TOOL, PATCH_TOOL, ToolStats
+from nano.codeset import CodesetAgent
 
 # litellm is very slow to import, so we lazy load it
 _litellm = None
@@ -42,8 +43,8 @@ You have two tools: `shell` for executing terminal commands and `apply_patch` fo
 - Check structure: `ls -la specific/dir/` before broad exploration.
 
 **Patch guidelines:**
-- Each patch must be atomic with unique search strings
-- Maintain exact whitespace and correct indentation
+- Patches must be in the unified diff format.
+- Ensure the patch applies cleanly before submitting.
 
 ## Operating Environment
 - Cannot ask questions or seek clarification
@@ -75,7 +76,8 @@ class Agent:
             min_p: float = 0.0,
             top_k: int = 20,
             verbose: bool = False,
-            log: bool = True
+            log: bool = True,
+            remote: bool = False
         ):
         """Initialize a Nano instance.
 
@@ -92,12 +94,14 @@ class Agent:
             top_k (int): Top-k sampling cutoff; only the highest-probability `k` tokens are considered.
             verbose (bool): If True, prints tool calls and their outputs
             log (bool): If True, logs the agent's actions to a file
+            remote (bool): If True, runs the agent in remote mode on a codeset environment
         """
         self.tool_limit = tool_limit
         self.token_limit = token_limit
         self.response_limit = response_limit
         self.verbose = verbose
         self.log = log
+        self.remote = remote
         
         self.tools = [SHELL_TOOL, PATCH_TOOL]
         
@@ -141,18 +145,22 @@ class Agent:
     def tool_stats(self)->dict[str, Union[int, float]]:
         return self.stats.report()
         
-    def run(self, task: str, repo_root: Optional[Union[str, Path]] = None) -> str:
+    def run(self, task: str, repo_root: Optional[Union[str, Path]] = None, sample_id: Optional[str] = None) -> str:
         """
         Run the agent on the given repository with the given task.
         Returns the unified diff of the changes made to the repository.
         """
-        repo_root = Path(repo_root).absolute() if repo_root else Path.cwd()
-
-        assert repo_root.exists(), "Repository not found"
-        assert is_git_repo(repo_root), "Must be run inside a git repository"
-        assert is_clean(repo_root), "Repository must be clean"
-
         self._reset()  # initializes the internal history and trajectory files
+
+        if self.remote:
+            assert sample_id, "sample_id is required for remote mode"
+            codeset_agent = CodesetAgent(stats=self.stats, sample_id=sample_id, verbose=self.verbose)
+        else:
+            repo_root = Path(repo_root).absolute() if repo_root else Path.cwd()
+            assert repo_root.exists(), "Repository not found"
+            assert is_git_repo(repo_root), "Must be run inside a git repository"
+            assert is_clean(repo_root), "Repository must be clean"
+
         self._append({"role": "user", "content": task})
 
         while self.remaining_tool_calls >= 0 and self.remaining_tokens > self.MINIMUM_TOKENS:
@@ -161,13 +169,14 @@ class Agent:
             if self.verbose and msg.get("content"): print(msg["content"])
 
             if not msg.get("tool_calls"):
+                if self.remote: break
                 if not is_clean(repo_root): break  # the agent has made changes, and didn't request any more tools so it is done
                 # the agent hasn't made changes, so we remind it to operate autonomously
                 self._append({"role": "user", "content": warning("Use shell to explore or apply_patch to make changes. Do not stop working.")})
                 self.tool_usage += 1  # inaction is an action
                 continue
 
-            for call in msg["tool_calls"]:  
+            for call in msg["tool_calls"]:
                 name = call["function"]["name"]
                 try:
                     args = json.loads(call["function"]["arguments"])
@@ -177,19 +186,32 @@ class Agent:
                     self.tool_usage += 1
                     continue
 
-                if name == "shell":
-                    output = shell(args=args, repo_root=repo_root, stats=self.stats, verbose=self.verbose)
-
-                elif name == "apply_patch":
-                    output = apply_patch(args=args, repo_root=repo_root, stats=self.stats, verbose=self.verbose)
-
+                if self.remote:
+                    if name == "shell":
+                        output = codeset_agent.shell(args)
+                    elif name == "apply_patch":
+                        output = codeset_agent.apply_patch(args)
+                    else:
+                        output = warning(f"unknown tool: {name}")
                 else:
-                    output = warning(f"unknown tool: {name}")
-            
+                    if name == "shell":
+                        output = shell(args=args, repo_root=repo_root, stats=self.stats, verbose=self.verbose)
+
+                    elif name == "apply_patch":
+                        output = apply_patch(args=args, repo_root=repo_root, stats=self.stats, verbose=self.verbose)
+
+                    else:
+                        output = warning(f"unknown tool: {name}")
+
                 self._tool_reply(call, output)
                 self.tool_usage += 1
 
-        unified_diff = git_diff(repo_root)
+        if self.remote:
+            codeset_agent.close()
+            unified_diff = ""
+        else:
+            unified_diff = git_diff(repo_root)
+
         if self.log: 
             self.diff_file.open("w").write(unified_diff)
             self.stats_file = self.out_dir/"stats.json"
