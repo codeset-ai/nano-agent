@@ -4,6 +4,7 @@ import os
 import dotenv
 
 from codeset import Codeset
+
 from nano.tools import ToolStats
 from nano.utils import warning
 
@@ -66,4 +67,6 @@ class CodesetAgent:
             return warning(f"apply_patch failed: {e}")
 
     def close(self):
-        self.client.sessions.close(session_id=self.session.session_id)
+        response = self.client.sessions.close(session_id=self.session.session_id)
+        if self.verbose:
+            print(f"closed session: {response}")

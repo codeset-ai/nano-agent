@@ -6,7 +6,7 @@ from datetime import datetime
 
 from nano.utils import is_git_repo, is_clean, git_diff, feedback, warning
 from nano.tools import shell, apply_patch, SHELL_TOOL, PATCH_TOOL, ToolStats
-from nano.codeset import CodesetAgent
+from nano.codeset_agent import CodesetAgent
 
 # litellm is very slow to import, so we lazy load it
 _litellm = None
