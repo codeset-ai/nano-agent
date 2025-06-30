@@ -1,6 +1,8 @@
 
 import os
+import time
 
+from codeset.types.sessions.job_status import JobStatus
 import dotenv
 
 from codeset import Codeset
@@ -66,7 +68,35 @@ class CodesetAgent:
             self.stats.record_patch(success=False)
             return warning(f"apply_patch failed: {e}")
 
+    def verify(self) -> bool:
+        if self.verbose:
+            print("Verifying session...")
+
+        # Start verification
+        response = self.client.sessions.verify.start(session_id=self.session.session_id)
+
+        # Wait for verification to complete
+        while True:
+            response = self.client.sessions.verify.status(
+                job_id=response.job_id,
+                session_id=self.session.session_id
+            )
+            if response.status in ["completed", "error", "cancelled"]:
+                break
+            time.sleep(1)
+
+        if self.verbose:
+            print(f"Verification completed: {response}")
+
+        # Check if verification was successful
+        if response.status == "completed" and response.result:
+            return response.result.is_success
+        else:
+            return False
+
     def close(self):
         response = self.client.sessions.close(session_id=self.session.session_id)
         if self.verbose:
-            print(f"closed session: {response}")
+            cost = response.duration_seconds / 60 * 0.05
+            print(f"Session duration: {response.duration_seconds:.2f}s")
+            print(f"Approx. cost: ${cost:.4f}")

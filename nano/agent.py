@@ -207,6 +207,8 @@ class Agent:
                 self.tool_usage += 1
 
         if self.remote:
+            # TODO: get diff from API
+            codeset_agent.verify()
             codeset_agent.close()
             unified_diff = ""
         else:
