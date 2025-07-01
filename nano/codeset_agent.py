@@ -2,7 +2,6 @@
 import os
 import time
 
-from codeset.types.sessions.job_status import JobStatus
 import dotenv
 
 from codeset import Codeset
