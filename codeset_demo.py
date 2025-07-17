@@ -11,10 +11,10 @@ agent = Agent(
 )
 
 # Step 2. Run the agent on the remote environment
-sample_id = "traccar-traccar-95fdfd770130"
+dataset = "gitbug-java"
+sample_id = "assertj-assertj-vavr-f4d7f276e87c"
 task = """
 Some of the tests in this project are failing. Your task is to fix the source code such that all tests pass.
-If needed, add the following Java SDK to the PATH: '/opt/hostedtoolcache/Java_Zulu_jdk/11.0.21-9/x64/bin'.
 """
 
 print(f"Running agent on sample_id={sample_id}...")

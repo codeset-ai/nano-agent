@@ -23,13 +23,17 @@ class CodesetAgent:
         verbose: bool = False,
     ):
         self.stats = stats
+        self.dataset = "gitbug-java" # TODO: make this configurable
         self.sample_id = sample_id
         self.verbose = verbose
         self.client = Codeset(
             api_key=CODESET_API_KEY,
             base_url=CODESET_BASE_URL,
         )
-        self.session = self.client.sessions.create(sample_id=self.sample_id)
+        self.session = self.client.sessions.create(
+            dataset=self.dataset,
+            sample_id=self.sample_id,
+        )
 
     def shell(self, args: dict) -> str:
         command = args.get("cmd")
@@ -44,6 +48,8 @@ class CodesetAgent:
                 session_id=self.session.session_id, command=command
             )
             self.stats.record_shell(cmd=command, success=True)
+            if self.verbose:
+                print(f"shell command completed: {response}")
             return f"stdout:\n{response.stdout}\nstderr:\n{response.stderr}"
         except Exception as e:
             self.stats.record_shell(cmd=command, success=False)

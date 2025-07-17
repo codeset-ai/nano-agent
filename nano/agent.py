@@ -131,6 +131,7 @@ class Agent:
         This will therefore sometimes be accurate, and sometimes underestimate. So we account for this in our token buffer.
         """
         litellm = _get_litellm()
+        litellm.drop_params = True
         return litellm.token_counter(self.llm_kwargs["model"], messages=self.messages, tools=self.tools)
     
     @property
