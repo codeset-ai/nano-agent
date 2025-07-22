@@ -102,6 +102,7 @@ class Agent:
         self.verbose = verbose
         self.log = log
         self.remote = remote
+        self.success = None
         
         self.tools = [SHELL_TOOL, PATCH_TOOL]
         
@@ -209,7 +210,7 @@ class Agent:
 
         if self.remote:
             # TODO: get diff from API
-            codeset_agent.verify()
+            self.success = codeset_agent.verify()
             codeset_agent.close()
             unified_diff = ""
         else:
@@ -223,6 +224,14 @@ class Agent:
             print(f"\nToken count: {self.token_usage}, tool calls: {self.tool_usage}")
             print(f"Tool stats: \n{self.tool_stats}")
         return unified_diff
+    
+    def is_successful(self)->bool:
+        if not self.remote:
+            raise ValueError("Agent is not running in remote mode")
+        if self.success is None:
+            raise ValueError("Agent has not run yet")
+
+        return self.success
 
     def _chat(self) -> dict:
         # Dynamic response sizing to prevent context window errors
