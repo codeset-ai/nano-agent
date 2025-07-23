@@ -3,11 +3,11 @@ from nano.agent import Agent
 # Step 1. Instantiate the nano agent
 print("\nInitializing nano agent...")
 agent = Agent(
-    model="openai/gpt-4.1",
+    model="gemini/gemini-2.5-flash",
     remote=True,
     verbose=True,
     token_limit=64000,
-    tool_limit=100,
+    tool_limit=200,
 )
 
 # Step 2. Run the agent on the remote environment

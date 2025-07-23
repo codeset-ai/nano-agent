@@ -9,7 +9,7 @@ setup(
     name="nano-agent",
     version=version,
     packages=find_packages(),
-    install_requires=["litellm>=1.73.0", "codeset>=0.1.0a10", "dotenv>=0.9.9"],
+    install_requires=["litellm>=1.73.0", "codeset>=0.1.0a12", "dotenv>=0.9.9"],
     extras_require={"test": ["GitPython>=3.1.0"]},  # For SWE-Bench testing
     entry_points={
         "console_scripts": [

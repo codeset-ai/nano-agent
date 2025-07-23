@@ -12,7 +12,6 @@ from nano.utils import warning
 dotenv.load_dotenv()
 
 CODESET_API_KEY = os.getenv("CODESET_API_KEY")
-CODESET_BASE_URL = os.getenv("CODESET_BASE_URL")
 
 
 class CodesetAgent:
@@ -28,7 +27,6 @@ class CodesetAgent:
         self.verbose = verbose
         self.client = Codeset(
             api_key=CODESET_API_KEY,
-            base_url=CODESET_BASE_URL,
         )
         self.session = self.client.sessions.create(
             dataset=self.dataset,
@@ -56,16 +54,19 @@ class CodesetAgent:
             return warning(f"shell command failed: {e}")
 
     def apply_patch(self, args: dict) -> str:
-        patch = args.get("patch")
-        if not patch:
-            return warning("apply_patch: missing patch")
+        file_path, search, replace = args.get("file_path"), args.get("search"), args.get("replace")
+        if not file_path or not search or not replace:
+            return warning("apply_patch: missing file_path, search, or replace")
 
         if self.verbose:
-            print(f"applying patch:\n{patch}")
+            print(f"applying patch:\n{file_path}, {search}, {replace}")
 
         try:
-            self.client.sessions.apply_diff(
-                session_id=self.session.session_id, diff=patch
+            self.client.sessions.str_replace(
+                session_id=self.session.session_id,
+                file_path=file_path,
+                str_to_replace=search,
+                str_to_insert=replace,
             )
             self.stats.record_patch(success=True)
             return "Patch applied successfully"
